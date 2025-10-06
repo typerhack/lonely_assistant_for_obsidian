@@ -52,27 +52,38 @@
 - Model dropdown reflects Ollama list with refresh, and selection drives new chats.
 - Cancel/resume flows leave UI responsive with history intact.
 
-### Phase 2: Context Awareness & File Integration
+### Phase 2: Context Awareness & File Integration (RAG)
 4. **Current Note Context Integration**
-   - Implement active file content reading
-   - Add cursor position and selection awareness
-   - Create context extraction for relevant note sections
-   - Integrate context into chat prompts automatically
+   - [x] Implement active file content reading and selection awareness
+   - [x] Extract semantic chunks (headings/blocks) for note-level context
+   - [x] Surface a preview drawer showing what will be sent with the prompt
+   - [x] Allow users to opt-in/out of contextual injection per message
 
-5. **Vault Indexing System**
-   - Build vault file scanner and indexer
-   - Implement search functionality across all notes
-   - Create relevance ranking for context retrieval
-   - Add caching system for performance optimization
+5. **Vault Indexing & Retrieval (RAG Core)**
+   - [x] Build incremental vault indexer that respects ignore lists and hidden folders
+   - [x] Choose retrieval strategy (BM25/search baseline with optional embeddings)
+   - [x] Chunk Markdown with metadata (path, heading, updated timestamp)
+   - [x] Persist index/embeddings under `.lonely-assistant/index/`
+   - [x] Implement retrieval scoring and top-N selection for prompts
+   - [x] Add refresh queue and background throttling to keep RAG current
 
-6. **File Editing Capabilities**
-   - Implement safe file modification APIs
-   - Add diff preview for proposed changes
-   - Create undo/redo integration with Obsidian
-   - Add user confirmation dialogs for edits
+6. **Context Injection & Safety**
+   - [x] Merge active note context with retrieved snippets into prompt templates
+   - [x] Display injected context to the user before sending (editable toggle)
+   - [x] Log retrieval provenance in chat history for auditing
+   - [x] Provide per-vault privacy controls (allow/deny folders, clear index)
+
+7. **File Editing Capabilities**
+   - [x] Implement safe file modification APIs
+   - [x] Add diff preview for proposed changes
+   - [x] Create undo/redo integration with Obsidian
+   - [x] Add user confirmation dialogs for edits
 
 **Exit Criteria**
-- Context injection visible and reviewable before send; indexer yields during idle.
+- Context preview shows active note + retrieved RAG snippets before send
+- Vault index refresh completes without blocking UI and respects privacy settings
+- Users can clear/disable RAG indexing at any time without leftover artifacts
+- Streamed responses reference retrieved snippets (provenance metadata available)
 
 ### Phase 3: Advanced AI Features
 7. **Ask vs Agent Mode Implementation**
@@ -175,7 +186,8 @@
 ## Current Status
 - Phase 0: Complete ✅
 - Phase 1: Complete ✅
-- All other phases: Planned
+- Phase 2: In progress — RAG baseline implemented, editing workflow pending
+- Phases 3+: Planned
 
 ## Technical Architecture
 - **Frontend**: React-based chat interface within Obsidian sidebar

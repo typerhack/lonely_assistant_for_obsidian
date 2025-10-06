@@ -1,9 +1,44 @@
 # Project Status
 
+## v0.0.2
+
+### Changelog
+
+- Documentation and API:
+  - Added `docs/API_DOC.md` for documenting code-level API changes.
+  - Updated `AGENTS.md` to require API documentation before shipping new APIs.
+  - Expanded and clarified Phase 2 (RAG) and editing capabilities in `docs/PROJECT_PHASE.md`.
+  - Updated `docs/SYSTEM_DESIGN.md` with new context and mention UI/UX details.
+
+- Features and Enhancements:
+  - Implemented `src/rag.ts` for retrieval-augmented generation (RAG) logic.
+  - Added `src/editing.ts` for safe editing workflow and helper APIs.
+  - Improved context preview, mention suggestions, and provenance tracking in the UI.
+  - Enhanced styles in `styles.css` for context, mentions, diff modals, and chat bubbles.
+
+- Refactoring and Maintenance:
+  - Updated `main.ts`, `manifest.json`, `package.json`, and `src/settings.ts` for new features and settings.
+  - Modified `src/LonelyAssistantView.ts` for context preview and editing integration.
+
+- Other:
+  - Added/modified files in `src/` and `docs/` as part of Phase 2 and editing workflow.
+
 ## v0.0.1
 
 ### Changelog
 
+- Added Phase 2 RAG baseline:
+  - Implemented vault indexer with incremental updates and exclusion list support.
+  - Added context retrieval service with active note snippets + vault ranking.
+  - Integrated context preview panel, per-message toggle, and provenance footnotes in the sidebar view.
+  - Persisted index data under `.lonely-assistant/index/` with rebuild/clear controls in settings.
+- Delivered safe editing workflow:
+  - Added diff preview modal with explicit confirm before applying changes.
+  - Introduced command to apply the last assistant response to the current selection or entire note with undo support.
+  - Implemented editing helper API for future automated proposals.
+- Chat enhancements:
+  - Added `@Note` mentions with live suggestions, mention-based context retrieval, and provenance tracking.
+  - Context preview now merges active, retrieved, and mention snippets while allowing per-message toggles.
 - Updated `docs/PROJECT_PHASE.md`:
   - Clarified scope wording and added detailed task checklist for Phase 0 (MVP).
 - Major refactor of `main.ts`:

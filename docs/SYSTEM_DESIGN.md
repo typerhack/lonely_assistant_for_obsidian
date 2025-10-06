@@ -50,7 +50,14 @@ Always use native Obsidian CSS variables:
 }
 ```
 - User bubble: same structure but filled with `var(--interactive-accent)` and text `var(--text-on-accent)`.
+- Assistant bubble: renders markdown content with syntax highlighting for code blocks.
+- Code blocks: use `var(--background-primary)` background with `var(--font-monospace)` font.
+- Inline code: `background-primary`, `2px 6px` padding, `4px` border radius.
 - Streaming indicator: inline flex dots that inherit `var(--text-muted)` (`lonely-assistant-typing` class) with 1.2s loop.
+
+### Header
+- Flex row with space-between layout, `gap: 12px`.
+- New Chat button: `32px` square icon button with `8px` radius, hover lifts with accent color.
 
 ### Input Area
 - Card: `padding: 14px`, `border-radius: 12px`, background `var(--background-secondary-alt)`.

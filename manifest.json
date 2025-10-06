@@ -1,7 +1,7 @@
 {
 	"id": "lonely-assistant",
 	"name": "Lonely Assistant",
-	"version": "0.0.1",
+	"version": "0.0.2",
 	"minAppVersion": "0.15.0",
 	"description": "A lonely AI assistant that lives in your Obsidian vault. (Chat with local Ollama or any OpenAI-compatible server from Obsidian.)",
 	"author": "Lonely-Creator",

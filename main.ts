@@ -2,18 +2,24 @@ import { App, Plugin, PluginSettingTab, Setting, Notice, WorkspaceLeaf, Editor }
 import { LonelyAssistantView, VIEW_TYPE_LONELY_ASSISTANT } from './src/LonelyAssistantView'
 import { OllamaClient } from './src/OllamaClient'
 import { LonelyAssistantSettings, mergeSettings, DEFAULT_SETTINGS } from './src/settings'
+import { RAGService } from './src/rag'
+import { previewAndApplySelection } from './src/editing'
 
 export default class LonelyAssistantPlugin extends Plugin {
 	settings: LonelyAssistantSettings
 	ollamaClient: OllamaClient
 	availableModels: string[] = []
 	modelLoadError: string | null = null
+	ragService: RAGService
 
 	async onload() {
 		await this.loadSettings()
 
 		this.ollamaClient = new OllamaClient(this.settings.ollamaHost)
 		await this.refreshModels()
+
+		this.ragService = new RAGService(this)
+		await this.ragService.initialize()
 
 		// Register the sidebar view
 		this.registerView(VIEW_TYPE_LONELY_ASSISTANT, (leaf) => new LonelyAssistantView(leaf, this))
@@ -37,6 +43,25 @@ export default class LonelyAssistantPlugin extends Plugin {
 			},
 		})
 
+		this.addCommand({
+			id: 'apply-last-response-to-selection',
+			name: 'Apply Last Response to Selection',
+			editorCallback: async (editor: Editor) => {
+				const leaves = this.app.workspace.getLeavesOfType(VIEW_TYPE_LONELY_ASSISTANT)
+				if (!leaves.length) {
+					new Notice('Open Lonely Assistant before applying a response')
+					return
+				}
+				const view = leaves[0].view as LonelyAssistantView
+				const response = view.getLastAssistantResponse()
+				if (!response) {
+					new Notice('No assistant response available to apply')
+					return
+				}
+				await previewAndApplySelection(this.app, editor, response, 'Apply Lonely Assistant response')
+			},
+		})
+
 		// Add settings tab
 		this.addSettingTab(new LonelyAssistantSettingTab(this.app, this))
 	}
@@ -51,6 +76,9 @@ export default class LonelyAssistantPlugin extends Plugin {
 
 	async saveSettings() {
 		await this.saveData(this.settings)
+		if (this.ragService) {
+			await this.ragService.setEnabled(this.settings.ragEnabled)
+		}
 	}
 
 	async activateView() {
@@ -264,5 +292,72 @@ class LonelyAssistantSettingTab extends PluginSettingTab {
 				await this.plugin.saveSettings()
 			})
 		})
+
+		containerEl.createEl('h3', { text: 'Context & Retrieval (RAG)' })
+
+		new Setting(containerEl)
+			.setName('Enable context retrieval')
+			.setDesc('Toggle Retrieval Augmented Generation (RAG) to inject relevant note snippets into prompts')
+			.addToggle(toggle => {
+				toggle.setValue(this.plugin.settings.ragEnabled)
+				toggle.onChange(async (value) => {
+					this.plugin.settings.ragEnabled = value
+					await this.plugin.saveSettings()
+					if (value) {
+						await this.plugin.ragService.initialize()
+					}
+				})
+			})
+
+		new Setting(containerEl)
+			.setName('Max context snippets')
+			.setDesc('Total number of chunks (active + retrieved) to include with each request')
+			.addSlider(slider => {
+				slider.setLimits(1, 8, 1)
+				slider.setValue(this.plugin.settings.ragMaxContext)
+				slider.setDynamicTooltip()
+				slider.onChange(async (value) => {
+					this.plugin.settings.ragMaxContext = value
+					await this.plugin.saveSettings()
+				})
+			})
+
+		new Setting(containerEl)
+			.setName('Exclude folders')
+			.setDesc('Comma-separated folder prefixes to skip when indexing (example: Templates, Private)')
+			.addTextArea(text => {
+				text.setPlaceholder('Templates, Private')
+				text.setValue(this.plugin.settings.ragExcludeFolders.join(', '))
+				text.inputEl.rows = 3
+				text.onChange(async (value) => {
+					this.plugin.settings.ragExcludeFolders = value
+						.split(',')
+						.map((entry) => entry.trim())
+						.filter(Boolean)
+					await this.plugin.saveSettings()
+				})
+				text.inputEl.addEventListener('blur', () => {
+					void this.plugin.ragService.rebuildIndex()
+				})
+			})
+
+		new Setting(containerEl)
+			.setName('Rebuild / Clear index')
+			.setDesc('Rebuild the RAG index or clear it from disk')
+			.addButton(button => {
+				button.setButtonText('Rebuild index')
+				button.onClick(async () => {
+					await this.plugin.ragService.rebuildIndex()
+					new Notice('Rebuilt Lonely Assistant index')
+				})
+			})
+			.addExtraButton(button => {
+				button.setIcon('trash')
+				button.setTooltip('Clear stored index')
+				button.onClick(async () => {
+					await this.plugin.ragService.clearIndex()
+					new Notice('Cleared Lonely Assistant index')
+				})
+			})
 	}
 }

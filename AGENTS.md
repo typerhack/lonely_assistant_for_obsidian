@@ -3,6 +3,7 @@
 **IMPORTANT**: Always check the `docs/` folder for the latest documentation and project-specific guidelines before making changes.
 
 - UI and styling decisions **must** follow `docs/SYSTEM_DESIGN.md`. Review it before introducing or adjusting any user interface.
+- Any code-level API changes **must** be documented in `docs/API_DOC.md` before shipping. New APIs are not considered complete until the documentation is updated.
 
 ## Build Commands
 - `npm run dev` - Development build with watch mode
