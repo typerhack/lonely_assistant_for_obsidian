@@ -1,94 +1,92 @@
-# Obsidian Sample Plugin
+# Lonely Assistant
 
-This is a sample plugin for Obsidian (https://obsidian.md).
+Lonely Assistant is a small Obsidian plugin that provides an in-vault AI assistant integration focused on Ollama (local and self-hosted Ollama servers). It plans to support other OpenAI-compatible APIs in the future. The plugin makes it simple to use GPT-OSS and other models inside your Obsidian vault with configurable prompts, models, and safety defaults.
 
-This project uses TypeScript to provide type checking and documentation.
-The repo depends on the latest plugin API (obsidian.d.ts) in TypeScript Definition format, which contains TSDoc comments describing what it does.
+## Key goals
 
-This sample plugin demonstrates some of the basic functionality the plugin API can do.
-- Adds a ribbon icon, which shows a Notice when clicked.
-- Adds a command "Open Sample Modal" which opens a Modal.
-- Adds a plugin setting tab to the settings page.
-- Registers a global click event and output 'click' to the console.
-- Registers a global interval which logs 'setInterval' to the console.
+-   Fast, local-first AI flows using Ollama
+-   Easy configuration for model, temperature, and token limits
+-   Minimal, unobtrusive UI inside Obsidian
+-   Extensible to other OpenAI-compatible endpoints
 
-## First time developing plugins?
+## Features
 
-Quick starting guide for new plugin devs:
+-   Send selected text or the current note to an Ollama model and insert or preview the response
+-   Per-vault settings for Ollama host, model, temperature, max tokens, and default prompt
+-   Simple command palette actions and an optional ribbon icon
+-   Local-first behavior when Ollama is available; configurable fallback for external APIs
+-   Config validation and sensible defaults
 
-- Check if [someone already developed a plugin for what you want](https://obsidian.md/plugins)! There might be an existing plugin similar enough that you can partner up with.
-- Make a copy of this repo as a template with the "Use this template" button (login to GitHub if you don't see it).
-- Clone your repo to a local development folder. For convenience, you can place this folder in your `.obsidian/plugins/your-plugin-name` folder.
-- Install NodeJS, then run `npm i` in the command line under your repo folder.
-- Run `npm run dev` to compile your plugin from `main.ts` to `main.js`.
-- Make changes to `main.ts` (or create new `.ts` files). Those changes should be automatically compiled into `main.js`.
-- Reload Obsidian to load the new version of your plugin.
-- Enable plugin in settings window.
-- For updates to the Obsidian API run `npm update` in the command line under your repo folder.
+## Getting started
 
-## Releasing new releases
+### 1. Install
 
-- Update your `manifest.json` with your new version number, such as `1.0.1`, and the minimum Obsidian version required for your latest release.
-- Update your `versions.json` file with `"new-plugin-version": "minimum-obsidian-version"` so older versions of Obsidian can download an older version of your plugin that's compatible.
-- Create new GitHub release using your new version number as the "Tag version". Use the exact version number, don't include a prefix `v`. See here for an example: https://github.com/obsidianmd/obsidian-sample-plugin/releases
-- Upload the files `manifest.json`, `main.js`, `styles.css` as binary attachments. Note: The manifest.json file must be in two places, first the root path of your repository and also in the release.
-- Publish the release.
+-   Copy the built plugin folder into your Obsidian vault's `.obsidian/plugins/lonely-assistant/`
+-   Enable the plugin in Obsidian Settings → Community plugins
 
-> You can simplify the version bump process by running `npm version patch`, `npm version minor` or `npm version major` after updating `minAppVersion` manually in `manifest.json`.
-> The command will bump version in `manifest.json` and `package.json`, and add the entry for the new version to `versions.json`
+### 2. Basic usage
 
-## Adding your plugin to the community plugin list
+-   Open the command palette (Ctrl/Cmd+P)
+-   Run `Lonely Assistant: Ask model` to send the selection or current note
+-   Use settings (Settings → Community plugins → Lonely Assistant) to set your Ollama host, default model, and options
 
-- Check the [plugin guidelines](https://docs.obsidian.md/Plugins/Releasing/Plugin+guidelines).
-- Publish an initial version.
-- Make sure you have a `README.md` file in the root of your repo.
-- Make a pull request at https://github.com/obsidianmd/obsidian-releases to add your plugin.
+## Settings (recommended)
 
-## How to use
+-   Ollama Host: `http://127.0.0.1:11434` (or your Ollama server)
+-   Model: `gpt-oss` (or any Ollama-supported model)
+-   Temperature: `0.2` (float)
+-   Max Tokens: `1024` (integer)
+-   Default Prompt: A short system-style message used when no prompt is set
 
-- Clone this repo.
-- Make sure your NodeJS is at least v16 (`node --version`).
-- `npm i` or `yarn` to install dependencies.
-- `npm run dev` to start compilation in watch mode.
-
-## Manually installing the plugin
-
-- Copy over `main.js`, `styles.css`, `manifest.json` to your vault `VaultFolder/.obsidian/plugins/your-plugin-id/`.
-
-## Improve code quality with eslint (optional)
-- [ESLint](https://eslint.org/) is a tool that analyzes your code to quickly find problems. You can run ESLint against your plugin to find common bugs and ways to improve your code. 
-- To use eslint with this project, make sure to install eslint from terminal:
-  - `npm install -g eslint`
-- To use eslint to analyze this project use this command:
-  - `eslint main.ts`
-  - eslint will then create a report with suggestions for code improvement by file and line number.
-- If your source code is in a folder, such as `src`, you can use eslint with this command to analyze all files in that folder:
-  - `eslint ./src/`
-
-## Funding URL
-
-You can include funding URLs where people who use your plugin can financially support it.
-
-The simple way is to set the `fundingUrl` field to your link in your `manifest.json` file:
+## Example settings JSON
 
 ```json
 {
-    "fundingUrl": "https://buymeacoffee.com"
+	"ollamaHost": "http://127.0.0.1:11434",
+	"model": "gpt-oss",
+	"temperature": 0.2,
+	"maxTokens": 1024,
+	"defaultPrompt": "You are a helpful assistant focused on note-taking and ideas."
 }
 ```
 
-If you have multiple URLs, you can also do:
+## Development
 
-```json
-{
-    "fundingUrl": {
-        "Buy Me a Coffee": "https://buymeacoffee.com",
-        "GitHub Sponsor": "https://github.com/sponsors",
-        "Patreon": "https://www.patreon.com/"
-    }
-}
-```
+-   Development build (watch): `npm run dev`
+-   Production build: `npm run build`
 
-## API Documentation
+## Linting
 
-See https://github.com/obsidianmd/obsidian-api
+-   Lint main: `eslint main.ts`
+-   Lint src: `eslint ./src/`
+
+## Tests
+
+-   No test framework configured; consider adding Jest or similar
+-   After adding a test framework, run a single test with: `npm test -- --testNamePattern="test name"`
+
+## Code & style notes
+
+-   TypeScript strict mode recommended
+-   Explicit types for public APIs
+-   Prefer interfaces for settings and clear defaults
+-   Use async/await and try/catch for network operations
+-   Register cleanup (events, intervals, DOM) with Obsidian helpers
+-   Keep `main.ts` minimal and split features into `src/` modules
+
+## Security & privacy
+
+-   Designed for local-first use with Ollama — data remains in your environment when using a local Ollama host
+-   If configured to use an external API, be aware of the provider's data policies
+
+## Contributing
+
+-   Open an issue for feature requests or bugs
+-   PRs should follow the repository's TypeScript style and include meaningful commit messages
+-   Add tests when adding non-trivial logic
+
+## License
+
+-   Add your preferred license file in the repository (e.g., MIT)
+
+If you want, a concise Usage section or a screenshot can be added next. Specify preferred wording for the plugin name ("Lonely Assistant" vs "lonely assistant") and any example prompts to include.
