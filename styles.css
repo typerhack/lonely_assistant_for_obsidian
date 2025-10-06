@@ -1,8 +1,204 @@
-/*
+/* Lonely Assistant Plugin Styles */
 
-This CSS file will be included with your plugin, and
-available in the app when your plugin is enabled.
+.lonely-assistant-view {
+	display: flex;
+	flex-direction: column;
+	height: 100%;
+	padding: 16px;
+	box-sizing: border-box;
+	gap: 16px;
+}
 
-If your plugin does not need CSS, delete this file.
+.lonely-assistant-header {
+	display: flex;
+	justify-content: space-between;
+	align-items: center;
+	font-weight: 600;
+	font-size: 16px;
+}
 
-*/
+.lonely-assistant-status {
+	font-size: 11px;
+	color: var(--text-muted);
+}
+
+.lonely-assistant-output {
+	flex: 1;
+	display: flex;
+	flex-direction: column;
+	gap: 12px;
+	padding: 16px;
+	border-radius: 12px;
+	background-color: var(--background-secondary-alt);
+	border: 1px solid var(--background-modifier-border);
+	overflow-y: auto;
+}
+
+.lonely-assistant-messages {
+	display: flex;
+	flex-direction: column;
+	gap: 12px;
+	padding-right: 4px;
+}
+
+.lonely-assistant-empty {
+	text-align: center;
+	color: var(--text-muted);
+	font-size: 13px;
+	padding: 12px 0;
+}
+
+.lonely-assistant-message {
+	display: flex;
+	gap: 12px;
+}
+
+.lonely-assistant-message-user,
+.lonely-assistant-message-assistant {
+	justify-content: flex-start;
+}
+
+.lonely-assistant-message-user {
+	justify-content: flex-end;
+}
+
+.lonely-assistant-bubble {
+	max-width: 85%;
+	padding: 12px 14px;
+	border-radius: 14px;
+	background-color: var(--background-primary-alt);
+	white-space: pre-wrap;
+	word-wrap: break-word;
+	line-height: 1.55;
+	font-size: 13px;
+	border: 1px solid var(--background-modifier-border);
+	box-shadow: none;
+}
+
+.lonely-assistant-bubble-streaming {
+	display: inline-flex;
+	align-items: center;
+}
+
+.lonely-assistant-typing {
+	display: inline-flex;
+	gap: 2px;
+}
+
+.lonely-assistant-typing-dot {
+	font-size: 18px;
+	line-height: 1;
+	color: var(--text-muted);
+	animation: lonely-assistant-typing 1.2s ease-in-out infinite;
+}
+
+.lonely-assistant-typing-dot:nth-child(2) {
+	animation-delay: 0.15s;
+}
+
+.lonely-assistant-typing-dot:nth-child(3) {
+	animation-delay: 0.3s;
+}
+
+@keyframes lonely-assistant-typing {
+	0% {
+		opacity: 0.2;
+		transform: translateY(0);
+	}
+	40% {
+		opacity: 1;
+		transform: translateY(-2px);
+	}
+	100% {
+		opacity: 0.2;
+		transform: translateY(0);
+	}
+}
+
+.lonely-assistant-message-user .lonely-assistant-bubble {
+	background-color: var(--interactive-accent);
+	color: var(--text-on-accent);
+	border: none;
+}
+
+.lonely-assistant-input-container {
+	display: flex;
+	flex-direction: column;
+	gap: 10px;
+	padding: 14px;
+	border-radius: 12px;
+	background: var(--background-secondary-alt);
+	border: 1px solid var(--background-modifier-border);
+}
+
+.lonely-assistant-input {
+	width: 100%;
+	min-height: 64px;
+	padding: 10px 12px;
+	border: 1px solid var(--background-modifier-border);
+	border-radius: 10px;
+	background-color: var(--background-primary);
+	color: var(--text-normal);
+	resize: vertical;
+	font-family: inherit;
+	font-size: 14px;
+}
+
+.lonely-assistant-input:focus {
+	outline: none;
+	border-color: var(--interactive-accent);
+	box-shadow: 0 0 0 1px var(--interactive-accent);
+}
+
+.lonely-assistant-buttons {
+	display: flex;
+	gap: 10px;
+	justify-content: flex-end;
+}
+
+.lonely-assistant-send-button,
+.lonely-assistant-cancel-button {
+	padding: 8px 16px;
+	border: none;
+	border-radius: 10px;
+	cursor: pointer;
+	font-size: 13px;
+	font-weight: 600;
+	transition: transform 0.12s ease, box-shadow 0.12s ease;
+}
+
+.lonely-assistant-send-button {
+	background-color: var(--interactive-accent);
+	color: var(--text-on-accent);
+}
+
+.lonely-assistant-send-button:hover:not(:disabled) {
+	transform: translateY(-1px);
+	box-shadow: 0 6px 14px rgba(0, 0, 0, 0.25);
+}
+
+.lonely-assistant-send-button:disabled {
+	opacity: 0.6;
+	cursor: not-allowed;
+	box-shadow: none;
+}
+
+.lonely-assistant-cancel-button {
+	background: rgba(255, 82, 82, 0.12);
+	color: rgba(255, 148, 148, 0.95);
+	border: 1px solid rgba(255, 148, 148, 0.2);
+}
+
+.lonely-assistant-cancel-button:hover {
+	background: rgba(255, 82, 82, 0.18);
+	transform: translateY(-1px);
+}
+
+.lonely-assistant-settings-textarea {
+	width: 100%;
+	min-height: 120px;
+	resize: vertical;
+	font-family: inherit;
+	font-size: 14px;
+	line-height: 1.4;
+}

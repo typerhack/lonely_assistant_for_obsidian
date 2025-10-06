@@ -2,6 +2,8 @@
 
 **IMPORTANT**: Always check the `docs/` folder for the latest documentation and project-specific guidelines before making changes.
 
+- UI and styling decisions **must** follow `docs/SYSTEM_DESIGN.md`. Review it before introducing or adjusting any user interface.
+
 ## Build Commands
 - `npm run dev` - Development build with watch mode
 - `npm run build` - Production build (includes TypeScript check)

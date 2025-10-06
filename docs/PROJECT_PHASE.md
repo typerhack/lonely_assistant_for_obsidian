@@ -2,9 +2,18 @@
 
 ### Phase 0: Walking Skeleton (MVP)
 **Scope**
-- Minimal sidebar view + single “Ask model” command wired to Ollama host from settings.
+- Minimal sidebar view + single "Ask model" command wired to Ollama host from settings.
 - Streamed text to output pane; cancel button.
 - Basic error handling and settings persistence.
+
+**Tasks**
+- [x] Update main.ts to implement Lonely Assistant plugin structure with Ollama settings interface
+- [x] Create basic sidebar view using Obsidian View API for chat interface
+- [x] Implement Ollama API client for basic chat completion requests
+- [x] Add 'Ask model' command that sends selected text or current note to Ollama
+- [x] Implement streaming response display in sidebar with cancel button
+- [x] Add basic error handling and connection testing
+- [x] Test plugin installation and basic functionality in fresh vault
 
 **Exit Criteria**
 - Plugin installable in a fresh vault and can produce a streamed response or actionable error.
