@@ -25,39 +25,32 @@
 - Cancel responsiveness
 - Failure rate
 
-## Overview
-Lonely Assistant is an advanced Obsidian plugin that provides a persistent AI chat sidebar with full vault awareness and context-aware editing capabilities. The plugin integrates with Ollama for local AI processing and offers GitHub Copilot-style "ask and agent" modes for intelligent note editing.
-
-## Key Features
-- **Persistent Chat Sidebar**: Right sidebar interface for continuous AI conversations
-- **Vault Awareness**: AI has access to entire Obsidian vault content for contextual responses
-- **Context-Aware Editing**: Can read current note content and suggest/propose edits (like GitHub Copilot)
-- **Dynamic Model Selection**: Auto-detects available Ollama models with in-chat model switching
-- **Ask vs Agent Modes**: Question-answering mode vs. proactive editing assistance mode
-
-## Work Breakdown Structure (WBS)
-
 ### Phase 1: Core Chat Infrastructure (Foundation)
+**Scope**
+- Establish production-ready chat sidebar with stable streaming and model management.
+- Persist conversations and settings reliably across reloads.
+
+**Tasks**
 1. **Plugin Architecture & Sidebar Setup**
-   - Create `src/` folder structure with modular components
-   - Implement right sidebar view using Obsidian's View API
-   - Set up basic chat UI with message history and input field
-   - Integrate sidebar toggle in ribbon and command palette
-
-2. **Basic Ollama Integration**
-   - Create Ollama API client with model listing capabilities
-   - Implement basic chat completion requests
-   - Add connection testing and error handling
-   - Set up streaming responses for real-time chat
-
+   - [x] Create `src/` folder structure with modular components
+   - [x] Implement right sidebar view using Obsidian's View API
+   - [x] Set up chat UI with message history, typing indicator, and action buttons
+   - [x] Integrate sidebar toggle in ribbon and command palette
+2. **Ollama Integration**
+   - [x] Create Ollama API client with model listing capabilities
+   - [x] Implement chat completion streaming with AbortController support
+   - [x] Add connection testing and surfaced errors in UI
+   - [x] Handle cancellations cleanly without leaving UI stuck
 3. **Settings & Model Management**
-   - Create settings tab with Ollama host configuration
-   - Implement automatic model detection from Ollama API
-   - Add model selection dropdown with refresh capability
-   - Store user preferences (temperature, max tokens, etc.)
+   - [x] Create settings tab with Ollama host configuration card
+   - [x] Implement automatic model detection & refresh control
+   - [x] Add validated inputs for temperature, max tokens, and prompt
+   - [x] Persist settings & update client when host/model changes
 
 **Exit Criteria**
-- Phase 1: No console errors after 10 sidebar open/close cycles; persistent settings and stable streaming.
+- No console errors after 10 sidebar open/close cycles; persistent settings and stable streaming.
+- Model dropdown reflects Ollama list with refresh, and selection drives new chats.
+- Cancel/resume flows leave UI responsive with history intact.
 
 ### Phase 2: Context Awareness & File Integration
 4. **Current Note Context Integration**
@@ -79,7 +72,7 @@ Lonely Assistant is an advanced Obsidian plugin that provides a persistent AI ch
    - Add user confirmation dialogs for edits
 
 **Exit Criteria**
-- Phase 2: Context injection visible and reviewable before send; indexer yields during idle.
+- Context injection visible and reviewable before send; indexer yields during idle.
 
 ### Phase 3: Advanced AI Features
 7. **Ask vs Agent Mode Implementation**
@@ -180,7 +173,8 @@ Lonely Assistant is an advanced Obsidian plugin that provides a persistent AI ch
 - Smooth reload with no memory leaks
 
 ## Current Status
-- Phase 1: Plugin architecture and sidebar foundation (Ready to Start)
+- Phase 0: Complete ✅
+- Phase 1: Complete ✅
 - All other phases: Planned
 
 ## Technical Architecture
@@ -220,7 +214,6 @@ Lonely Assistant is an advanced Obsidian plugin that provides a persistent AI ch
 - Telemetry/analytics collection
 
 ## Next Actions
-1. Implement Phase 0 and verify MVP checklist.
-2. Add per-phase checkbox lists for tracking.
-3. Document folder privacy defaults (allow/deny lists).
-4. Draft README integration with this WBS.
+1. Document folder privacy defaults (allow/deny lists).
+2. Draft README integration with this WBS.
+3. Start Phase 2 discovery work (context ingestion prototypes).
