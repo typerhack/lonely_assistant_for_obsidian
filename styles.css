@@ -161,13 +161,7 @@
 .lonely-assistant-context-item-path-container {
 	display: flex;
 	align-items: center;
-	gap: 6px;
 	min-width: 0;
-}
-
-.lonely-assistant-file-icon {
-	font-size: 12px;
-	flex-shrink: 0;
 }
 
 .lonely-assistant-context-item-path {
@@ -424,44 +418,45 @@
 
 .lonely-assistant-mention-suggestions {
 	display: none;
-	flex-direction: column;
-	margin-top: 4px;
+	position: absolute;
+	bottom: calc(100% + 6px);
+	left: 0;
+	right: 0;
 	border-radius: 8px;
 	border: 1px solid var(--background-modifier-border);
 	background-color: var(--background-primary);
-	box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+	box-shadow: 0 -2px 8px rgba(0, 0, 0, 0.1);
 	max-height: 240px;
 	overflow-y: auto;
-	z-index: 10;
+	z-index: 100;
+	padding: 2px;
 }
 
 .lonely-assistant-mention-suggestions.is-visible {
-	display: flex;
+	display: block;
 }
 
 .lonely-assistant-mention-list {
 	display: flex;
 	flex-direction: column;
+	padding: 6px 4px;
+	gap: 5px;
 }
 
 .lonely-assistant-mention-item {
 	display: flex;
-	flex-direction: column;
-	align-items: flex-start;
-	gap: 4px;
-	padding: 8px 12px;
+	align-items: center;
+	gap: 8px;
+	padding: 20px 10px;
 	background: transparent;
 	border: none;
-	border-bottom: 1px solid var(--background-modifier-border);
+	border-radius: 6px;
 	text-align: left;
 	cursor: pointer;
-	font-size: 12px;
+	font-size: 13px;
 	color: var(--text-normal);
-	transition: background-color 150ms ease;
-}
-
-.lonely-assistant-mention-item:last-child {
-	border-bottom: none;
+	transition: background-color 100ms ease;
+	width: 100%;
 }
 
 .lonely-assistant-mention-item:hover,
@@ -471,23 +466,38 @@
 
 .lonely-assistant-mention-item-header {
 	display: flex;
-	align-items: center;
-	gap: 6px;
+	flex-direction: column;
+	align-items: flex-start;
+	gap: 3px;
+	flex: 1;
+	min-width: 0;
+	padding: 5px 0;
 }
 
 .lonely-assistant-mention-file-icon {
-	font-size: 14px;
-	line-height: 1;
+	width: 16px;
+	height: 16px;
+	flex-shrink: 0;
+	opacity: 0.7;
 }
 
 .lonely-assistant-mention-name {
-	font-weight: 600;
+	font-weight: 500;
+	font-size: 13px;
 	color: var(--text-normal);
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	width: 100%;
 }
 
 .lonely-assistant-mention-path {
 	font-size: 11px;
 	color: var(--text-muted);
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	width: 100%;
 }
 
 .lonely-assistant-input-group {

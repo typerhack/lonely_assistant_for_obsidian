@@ -477,7 +477,6 @@ export class LonelyAssistantView extends ItemView {
 				const li = ul.createEl('li', { cls: 'lonely-assistant-context-item' })
 				
 				const pathContainer = li.createDiv({ cls: 'lonely-assistant-context-item-path-container' })
-				const fileIcon = pathContainer.createSpan({ cls: 'lonely-assistant-file-icon', text: '📄' })
 				const pathText = entry.chunk.headings.length 
 					? `${entry.chunk.file} › ${entry.chunk.headings.join(' › ')}` 
 					: entry.chunk.file
@@ -663,10 +662,12 @@ export class LonelyAssistantView extends ItemView {
 			if (index === this.mentionSelectedIndex) {
 				item.addClass('is-selected')
 			}
+			const iconContainer = item.createDiv({ cls: 'lonely-assistant-mention-file-icon' })
+			iconContainer.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline></svg>'
+			
 			const header = item.createDiv({ cls: 'lonely-assistant-mention-item-header' })
-			header.createSpan({ cls: 'lonely-assistant-mention-file-icon', text: '📄' })
 			header.createSpan({ cls: 'lonely-assistant-mention-name', text: file.basename })
-			item.createSpan({ cls: 'lonely-assistant-mention-path', text: file.path })
+			header.createSpan({ cls: 'lonely-assistant-mention-path', text: file.path })
 			item.addEventListener('mousedown', (event) => {
 				event.preventDefault()
 				this.insertMention(file)

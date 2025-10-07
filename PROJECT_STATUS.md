@@ -1,5 +1,20 @@
 # Project Status
 
+## v0.0.3
+
+### Changelog
+
+- Version bump to 0.0.3 in `manifest.json` and `package.json`.
+- UI/UX Improvements:
+  - Replaced file icon emoji with SVG icon in mention suggestions and context items (`src/LonelyAssistantView.ts`).
+  - Refined mention suggestion dropdown styles for better positioning, padding, and appearance (`styles.css`).
+  - Improved mention item layout, spacing, and file/path display for clarity and consistency (`styles.css`).
+  - Removed unused `.lonely-assistant-file-icon` styles and related markup.
+- Refactoring:
+  - Cleaned up redundant code and improved structure in `src/LonelyAssistantView.ts`.
+- Other:
+  - Minor style and layout adjustments for context and mention UI.
+
 ## v0.0.2
 
 ### Changelog
