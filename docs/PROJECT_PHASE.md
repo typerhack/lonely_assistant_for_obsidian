@@ -85,6 +85,48 @@
 - Users can clear/disable RAG indexing at any time without leftover artifacts
 - Streamed responses reference retrieved snippets (provenance metadata available)
 
+### Phase 2.5: Tool System for AI Agent Capabilities
+**Scope**
+- Provide the AI chat with a structured tool system to operate autonomously within the vault.
+- Enable the AI to find files, search content, apply edits, and access external knowledge.
+- All tools require user consent and provide preview/confirmation workflows for safety.
+
+**Tasks**
+8. **Tool Provider Architecture**
+   - [ ] Create `ToolProvider` interface for registering tools with metadata
+   - [ ] Implement `ToolRegistry` to manage available tools and their execution
+   - [ ] Add tool discovery and capability negotiation for AI context
+   - [ ] Implement tool execution with logging and user consent workflows
+
+9. **Vault Operation Tools**
+   - [ ] **Find Tool**: Search for files by name/path pattern using glob/fuzzy matching
+   - [ ] **Grep Tool**: Search file contents using regex patterns with context
+   - [ ] **Read Tool**: Retrieve full or partial file contents safely
+   - [ ] **Apply Patch Tool**: Propose and apply file edits with diff preview
+
+10. **External Knowledge Tools**
+    - [ ] **Web Search Tool**: Integrate Ollama's web search API for external queries
+    - [ ] **Web Fetch Tool**: Retrieve and parse web page content via Ollama API
+    - [ ] Add API key management for Ollama web search features
+    - [ ] Implement result caching and rate limiting
+
+11. **Tool UI & Safety**
+    - [ ] Display available tools in chat interface with descriptions
+    - [ ] Show tool execution previews before actions
+    - [ ] Add per-tool consent toggles in settings
+    - [ ] Log all tool invocations with results for auditing
+    - [ ] Implement rollback mechanisms for reversible operations
+
+**Exit Criteria**
+- All vault operation tools work reliably with file system operations
+- Web search integration successfully fetches and presents external knowledge
+- User consent workflow prevents unauthorized tool usage
+- Tool execution logs provide complete audit trail
+- AI agent can use tools in combination to accomplish complex tasks
+
+**Documentation**
+- See `docs/TOOLS_DOC.md` for detailed tool specifications and implementation guide
+
 ### Phase 3: Advanced AI Features
 7. **Ask vs Agent Mode Implementation**
    - Implement "Ask Mode": Pure Q&A with vault context
@@ -186,7 +228,8 @@
 ## Current Status
 - Phase 0: Complete ✅
 - Phase 1: Complete ✅
-- Phase 2: In progress — RAG baseline implemented, editing workflow pending
+- Phase 2: Complete ✅
+- Phase 2.5: Planned (Tool System)
 - Phases 3+: Planned
 
 ## Technical Architecture
