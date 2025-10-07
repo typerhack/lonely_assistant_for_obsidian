@@ -1,16 +1,20 @@
-import { ItemView, WorkspaceLeaf, Notice, TFile, MarkdownRenderer } from 'obsidian'
+import { ItemView, WorkspaceLeaf, Notice, TFile, MarkdownRenderer, setIcon } from 'obsidian'
+import { Logger } from './logger'
 import { OllamaClient, OllamaMessage } from './OllamaClient'
 import { LonelyAssistantSettings } from './settings'
 import type { RAGContext, RetrievedChunk } from './rag'
+import type { ToolRegistry } from './tools/ToolRegistry'
+import { convertToolsToOllamaSchemas } from './tools/toolSchemaConverter'
 
 interface LonelyAssistantPluginApi {
 	settings: LonelyAssistantSettings
 	ollamaClient: OllamaClient
 	ragService: {
-		getContextForMessage: (query: string) => Promise<RAGContext | null>
+		getContextForMessage: (query: string, options?: { allowRetrieved?: boolean }) => Promise<RAGContext | null>
 		getChunksForFiles: (filePaths: string[]) => Promise<RetrievedChunk[]>
 		buildPrompt: (active: RetrievedChunk[], retrieved: RetrievedChunk[], mentions?: RetrievedChunk[]) => string
 	}
+	toolRegistry: ToolRegistry
 }
 
 export const VIEW_TYPE_LONELY_ASSISTANT = 'lonely-assistant-view'
@@ -35,6 +39,7 @@ export class LonelyAssistantView extends ItemView {
 	inputWrapperEl: HTMLElement
 	messageElements: WeakMap<OllamaMessage, HTMLElement> = new WeakMap()
 	includeContext = true
+	contextMode: 'active-only' | 'active+vault' = 'active-only'
 	pendingContext: RAGContext | null = null
 	lastContext: RAGContext | null = null
 	lastAssistantText: string | null = null
@@ -81,6 +86,8 @@ export class LonelyAssistantView extends ItemView {
 		newChatButton.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>`
 		newChatButton.addEventListener('click', () => this.clearChat())
 
+		this.renderToolsSection()
+
 		this.contextContainer = this.contentEl.createDiv('lonely-assistant-context')
 		const contextHeader = this.contextContainer.createDiv('lonely-assistant-context-header')
 		const contextHeaderLeft = contextHeader.createDiv('lonely-assistant-context-header-left')
@@ -110,6 +117,24 @@ export class LonelyAssistantView extends ItemView {
 				this.renderContextPreview(null, 'disabled')
 			} else {
 				this.renderContextPreview(this.lastContext, this.lastContext ? 'ready' : 'idle')
+			}
+		})
+
+		// Context mode selector
+		const modeGroup = contextControls.createDiv({ cls: 'lonely-assistant-context-mode' })
+		const modeLabel = modeGroup.createEl('label', { cls: 'lonely-assistant-context-mode-label' })
+		modeLabel.setText('Source:')
+		const modeSelect = modeGroup.createEl('select', { cls: 'lonely-assistant-context-mode-select' })
+		modeSelect.append(
+			new Option('Active only', 'active-only'),
+			new Option('Active + vault', 'active+vault')
+		)
+		modeSelect.value = this.contextMode
+		modeSelect.addEventListener('change', () => {
+			this.contextMode = (modeSelect.value as 'active-only' | 'active+vault')
+			// Reset preview state; next send will collect accordingly
+			if (this.includeContext) {
+				this.renderContextPreview(null, 'idle')
 			}
 		})
 		
@@ -264,6 +289,16 @@ export class LonelyAssistantView extends ItemView {
 		this.startStreaming()
 
 		let assistantMessage: OllamaMessage | null = null
+		let chunksReceived = 0
+		let idleTimer: number | null = null
+		const resetIdle = () => {
+			if (idleTimer) window.clearTimeout(idleTimer)
+			idleTimer = window.setTimeout(() => {
+				try { this.abortController?.abort() } catch {}
+				Logger.warn('Streaming timeout: no data from Ollama within 25s')
+				new Notice('No response from model (timeout). Try again or check Ollama.')
+			}, 25000)
+		}
 
 		try {
 			const mentionNames = this.extractMentions(userContent)
@@ -281,7 +316,7 @@ export class LonelyAssistantView extends ItemView {
 			let context: RAGContext | null = null
 			if (this.includeContext && (this.plugin.settings.ragEnabled || mentionChunks.length)) {
 				this.renderContextPreview(null, 'pending')
-				context = await this.plugin.ragService.getContextForMessage(userContent)
+				context = await this.plugin.ragService.getContextForMessage(userContent, { allowRetrieved: this.contextMode === 'active+vault' })
 				if (context) {
 					context.mentions = mentionChunks
 					context.prompt = this.plugin.ragService.buildPrompt(context.active, context.retrieved, mentionChunks)
@@ -323,22 +358,226 @@ export class LonelyAssistantView extends ItemView {
 			}]
 			if (context && context.prompt) {
 				messages.push({ role: 'system', content: context.prompt })
+				Logger.info('Sending context', {
+					active: context.active.length,
+					retrieved: context.retrieved.length,
+					mentions: context.mentions?.length || 0,
+					promptChars: context.prompt.length,
+				})
 			}
 			messages.push(...conversation)
 
+			const tools = this.plugin.toolRegistry.getAvailableTools()
+			const ollamaTools = tools.length > 0 ? convertToolsToOllamaSchemas(tools) : undefined
+
 			let responseText = ''
-			for await (const chunk of this.plugin.ollamaClient.chat(
+			let finalMessage: OllamaMessage | null = null
+
+			resetIdle()
+			for await (const chunk of this.plugin.ollamaClient.chatWithTools(
 				messages,
 				this.plugin.settings.model,
 				{
 					temperature: this.plugin.settings.temperature,
 					maxTokens: this.plugin.settings.maxTokens,
+					tools: ollamaTools,
 				},
 				this.abortController.signal
 			)) {
-				responseText += chunk
-				assistantMessage.content = responseText
+				resetIdle()
+				if (chunk.type === 'content' && chunk.content) {
+					if (chunksReceived === 0) Logger.info('First content chunk received')
+					responseText += chunk.content
+					assistantMessage.content = responseText
+					this.updateMessage(assistantMessage)
+					chunksReceived += 1
+				} else if (chunk.type === 'message' && chunk.message) {
+					finalMessage = chunk.message
+				}
+			}
+
+			if (finalMessage?.tool_calls && finalMessage.tool_calls.length > 0) {
+				Logger.info('Tool calls from model', finalMessage.tool_calls)
+				this.setStatus('Executing tools...')
+				assistantMessage.tool_calls = finalMessage.tool_calls
+
+				for (const toolCall of finalMessage.tool_calls) {
+					const toolName = toolCall.function.name
+					const toolParams = this.normalizeToolArguments(toolCall.function.arguments)
+
+					try {
+						this.setStatus(`Executing ${toolName}...`)
+						const result = await this.plugin.toolRegistry.executeWithConsent(toolName, toolParams)
+						Logger.info('Tool executed', toolName, result.success)
+
+						// If find tool succeeded, augment context with found files as mentions
+						if (toolName === 'find' && result.success && Array.isArray((result as any).data)) {
+							const paths: string[] = ((result as any).data as Array<{ path?: string }> )
+								.map(item => String((item as any).path || ''))
+								.filter(Boolean)
+							const mentionChunks = await this.plugin.ragService.getChunksForFiles(paths)
+							if (mentionChunks.length) {
+								const base = this.pendingContext || { active: [], retrieved: [], mentions: [], prompt: '' }
+								const updatedMentions = [...(base.mentions || []), ...mentionChunks]
+								const updatedPrompt = this.plugin.ragService.buildPrompt(base.active, base.retrieved, updatedMentions)
+								this.pendingContext = { ...base, mentions: updatedMentions, prompt: updatedPrompt }
+								this.renderContextPreview(this.pendingContext, 'pending')
+								messages.push({ role: 'system', content: updatedPrompt })
+								Logger.info('Re-prompting after tool', { mentions: updatedMentions.length })
+							}
+
+							// Chain a grep over the found files to attach content snippets
+							const pattern = (toolParams && (toolParams as any).pattern) ? String((toolParams as any).pattern) : ''
+							if (pattern) {
+								try {
+									const grepResult = await this.plugin.toolRegistry.executeWithConsent('grep', {
+										pattern,
+										fileList: paths,
+										contextLines: 2,
+										maxMatches: 50,
+									})
+									if (grepResult.success && Array.isArray((grepResult as any).data)) {
+										const matches = (grepResult as any).data as Array<{ file: string; context: string }>
+										const toChunks = matches.slice(0, 12).map((m, i) => ({
+											chunk: {
+												id: `${m.file}::grep::${i}`,
+												file: m.file,
+												headings: [],
+												content: m.context,
+												contentLower: m.context.toLowerCase(),
+												updated: Date.now(),
+												start: 0,
+												end: m.context.length,
+											},
+											score: 1,
+											source: 'mention' as const,
+										}))
+										if (toChunks.length) {
+											const base2 = this.pendingContext || { active: [], retrieved: [], mentions: [], prompt: '' }
+											const mergedMentions = [...(base2.mentions || []), ...toChunks]
+											const newPrompt = this.plugin.ragService.buildPrompt(base2.active, base2.retrieved, mergedMentions)
+											this.pendingContext = { ...base2, mentions: mergedMentions, prompt: newPrompt }
+											this.renderContextPreview(this.pendingContext, 'pending')
+											messages.push({ role: 'system', content: newPrompt })
+											Logger.info('Attached grep snippets', { count: toChunks.length })
+										}
+									}
+								} catch (e) {
+									Logger.warn('Grep chain failed', e)
+								}
+							}
+						}
+
+						messages.push({
+							role: 'assistant',
+							content: responseText || '',
+							tool_calls: finalMessage.tool_calls,
+						})
+
+						messages.push({
+							role: 'tool',
+							content: JSON.stringify(result),
+						})
+
+						responseText = ''
+						assistantMessage.content = ''
+						this.updateMessage(assistantMessage)
+
+						resetIdle()
+						for await (const chunk of this.plugin.ollamaClient.chatWithTools(
+							messages,
+							this.plugin.settings.model,
+							{
+								temperature: this.plugin.settings.temperature,
+								maxTokens: this.plugin.settings.maxTokens,
+								tools: ollamaTools,
+							},
+							this.abortController.signal
+						)) {
+							resetIdle()
+							if (chunk.type === 'content' && chunk.content) {
+								responseText += chunk.content
+								assistantMessage.content = responseText
+								this.updateMessage(assistantMessage)
+								chunksReceived += 1
+							} else if (chunk.type === 'message' && chunk.message) {
+								finalMessage = chunk.message
+								Logger.info('Final message received after tool')
+							}
+						}
+
+						if (finalMessage?.tool_calls && finalMessage.tool_calls.length > 0) {
+							break
+						}
+					} catch (toolError) {
+						const errorMessage = toolError instanceof Error ? toolError.message : String(toolError)
+						new Notice(`Tool execution failed: ${errorMessage}`)
+						Logger.error('Tool execution failed', toolName, errorMessage)
+						
+						assistantMessage.content = responseText + `\n\n[Tool execution failed: ${errorMessage}]`
+						this.updateMessage(assistantMessage)
+						break
+					}
+				}
+
+				this.setStatus('')
+			}
+
+			// Re-ask fallback: if no tokens received or empty content after tool flow, try once without tools
+			if ((!responseText || !responseText.trim()) && (this.pendingContext || (finalMessage?.tool_calls?.length ?? 0) > 0)) {
+				Logger.warn('Empty/partial response after tools. Re-asking without tools...')
+				this.setStatus('Re-asking without tools...')
+				responseText = ''
+				assistantMessage.content = ''
 				this.updateMessage(assistantMessage)
+				chunksReceived = 0
+				resetIdle()
+				const retryMessages: OllamaMessage[] = [
+					{ role: 'system', content: this.plugin.settings.defaultPrompt },
+				]
+				if (this.pendingContext?.prompt) {
+					retryMessages.push({ role: 'system', content: this.pendingContext.prompt })
+				}
+				retryMessages.push(
+					{ role: 'system', content: 'You already have sufficient context above. Do not request or use any tools. Produce the final concise answer now.' },
+					{ role: 'user', content: userContent }
+				)
+
+				for await (const chunk of this.plugin.ollamaClient.chatWithTools(
+					retryMessages,
+					this.plugin.settings.model,
+					{ temperature: this.plugin.settings.temperature, maxTokens: this.plugin.settings.maxTokens, tools: undefined },
+					this.abortController.signal
+				)) {
+					resetIdle()
+					if (chunk.type === 'content' && chunk.content) {
+						if (chunksReceived === 0) Logger.info('First content chunk received (fallback)')
+						responseText += chunk.content
+						assistantMessage.content = responseText
+						this.updateMessage(assistantMessage)
+						chunksReceived += 1
+					}
+				}
+				// If still nothing, try non-streaming final ask
+				if (!responseText || !responseText.trim()) {
+					Logger.warn('Fallback streaming yielded no content; trying non-stream request...')
+					try {
+						const msg = await this.plugin.ollamaClient.chatOnce(
+							retryMessages,
+							this.plugin.settings.model,
+							{ temperature: this.plugin.settings.temperature, maxTokens: this.plugin.settings.maxTokens },
+							this.abortController.signal
+						)
+						if (msg?.content) {
+							assistantMessage.content = msg.content
+							this.updateMessage(assistantMessage)
+							Logger.info('Non-stream fallback returned content')
+						}
+					} catch (e) {
+						Logger.error('Non-stream fallback failed', e)
+					}
+				}
+				this.setStatus('')
 			}
 		} catch (error) {
 			if (error instanceof DOMException && error.name === 'AbortError') {
@@ -354,7 +593,14 @@ export class LonelyAssistantView extends ItemView {
 			}
 			new Notice(`Error: ${message}`)
 		} finally {
+			if (idleTimer) window.clearTimeout(idleTimer)
 			if (assistantMessage) {
+				if (!assistantMessage.content || assistantMessage.content.trim().length === 0) {
+					assistantMessage.content = chunksReceived > 0
+						? '(response ended unexpectedly)'
+						: 'No response received from model.'
+					this.updateMessage(assistantMessage)
+				}
 				this.lastAssistantText = assistantMessage.content || null
 			} else {
 				this.lastAssistantText = null
@@ -477,8 +723,15 @@ export class LonelyAssistantView extends ItemView {
 				return
 			}
 			const section = list.createDiv('lonely-assistant-context-section')
-			section.createSpan({ cls: 'lonely-assistant-context-section-title', text: label })
+			const header = section.createDiv({ cls: 'lonely-assistant-context-section-header' })
+			const toggle = header.createDiv({ cls: 'lonely-assistant-context-section-toggle' })
+			setIcon(toggle, 'chevron-down')
+			header.createSpan({ cls: 'lonely-assistant-context-section-title', text: label })
 			const ul = section.createEl('ul', { cls: 'lonely-assistant-context-items' })
+			header.addEventListener('click', () => {
+				section.classList.toggle('is-collapsed')
+				setIcon(toggle, section.classList.contains('is-collapsed') ? 'chevron-right' : 'chevron-down')
+			})
 			chunks.forEach((entry) => {
 				const li = ul.createEl('li', { cls: 'lonely-assistant-context-item' })
 				
@@ -490,8 +743,9 @@ export class LonelyAssistantView extends ItemView {
 				pathEl.setText(pathText)
 				pathEl.setAttribute('title', pathText)
 				
-				const snippetContent = entry.chunk.content.trim().slice(0, 150)
-				li.createEl('div', { cls: 'lonely-assistant-context-item-snippet', text: snippetContent + (entry.chunk.content.length > 150 ? '…' : '') })
+				const clean = this.sanitizeSnippet(entry.chunk.content)
+				const snippetContent = clean.trim().slice(0, 150)
+				li.createEl('div', { cls: 'lonely-assistant-context-item-snippet', text: snippetContent + (clean.length > 150 ? '…' : '') })
 			})
 		}
 
@@ -500,13 +754,28 @@ export class LonelyAssistantView extends ItemView {
 			renderSection(context.mentions || [], 'Mentions')
 	}
 
+	private sanitizeSnippet(text: string): string {
+		let out = text
+		// Remove markdown image embeds and wiki embeds
+		out = out.replace(/!\[[^\]]*\]\([^\)]+\)/g, '')
+		out = out.replace(/!\[\[[^\]]+\]\]/g, '')
+		// Replace standard links [text](url) with just the text
+		out = out.replace(/\[([^\]]+)\]\((?:[^\)]+)\)/g, '$1')
+		// Remove HTML img tags
+		out = out.replace(/<img[^>]*>/gi, '')
+		// Normalize whitespace
+		out = out.replace(/[\t\f\r]+/g, ' ')
+		out = out.replace(/\n{3,}/g, '\n\n')
+		return out
+	}
+
 	private attachContextFootnote(message: OllamaMessage, context: RAGContext | null) {
 		const bubble = this.messageElements.get(message)
 		if (!bubble) {
 			return
 		}
 		let footnote = bubble.querySelector('.lonely-assistant-context-footnote') as HTMLElement | null
-		if (!context || (!context.active.length && !context.retrieved.length)) {
+		if (!context || (!context.active.length && !context.retrieved.length && !(context.mentions && context.mentions.length))) {
 			if (footnote) {
 				footnote.remove()
 			}
@@ -539,9 +808,39 @@ export class LonelyAssistantView extends ItemView {
 		bubble.empty()
 		const isStreaming = options.streaming ?? content.length === 0
 
+		if (message.tool_calls && message.tool_calls.length > 0) {
+			const toolSection = bubble.createDiv({ cls: 'lonely-assistant-tool-calls' })
+			toolSection.createSpan({ cls: 'lonely-assistant-tool-calls-label', text: 'Used tools:' })
+			const toolList = toolSection.createDiv({ cls: 'lonely-assistant-tool-list' })
+			
+			for (const toolCall of message.tool_calls) {
+				const toolItem = toolList.createDiv({ cls: 'lonely-assistant-tool-item' })
+				
+				const toolHeader = toolItem.createDiv({ cls: 'lonely-assistant-tool-header' })
+				const toolIcon = toolHeader.createDiv({ cls: 'lonely-assistant-tool-icon' })
+				setIcon(toolIcon, this.getToolIcon(toolCall.function.name))
+				toolHeader.createSpan({ 
+					cls: 'lonely-assistant-tool-name', 
+					text: this.formatToolName(toolCall.function.name) 
+				})
+				
+					const normalizedArgs = this.normalizeToolArguments(toolCall.function.arguments)
+					if (normalizedArgs && Object.keys(normalizedArgs).length > 0) {
+						this.renderToolParams(toolItem, normalizedArgs)
+					}
+			}
+		}
+
 		if (!isStreaming) {
 			if (message.role === 'assistant') {
-				MarkdownRenderer.renderMarkdown(content, bubble, '', this)
+				if (content) {
+					MarkdownRenderer.renderMarkdown(content, bubble, '', this)
+				}
+			} else if (message.role === 'tool') {
+				const toolResult = bubble.createDiv({ cls: 'lonely-assistant-tool-result' })
+				toolResult.createSpan({ cls: 'lonely-assistant-tool-result-label', text: 'Tool result:' })
+				const resultContent = toolResult.createEl('pre', { cls: 'lonely-assistant-tool-result-content' })
+				resultContent.createEl('code', { text: content })
 			} else {
 				this.renderUserMessage(bubble, content)
 			}
@@ -550,10 +849,10 @@ export class LonelyAssistantView extends ItemView {
 		}
 
 		bubble.addClass('lonely-assistant-bubble-streaming')
-		const typing = bubble.createSpan({ cls: 'lonely-assistant-typing' })
-		for (let i = 0; i < 3; i++) {
-			typing.createSpan({ cls: 'lonely-assistant-typing-dot', text: '•' })
-		}
+		const waiting = bubble.createDiv({ cls: 'lonely-assistant-waiting' })
+		waiting.createSpan({ cls: 'lonely-assistant-waiting-text', text: 'Waiting for model' })
+		const typing = waiting.createSpan({ cls: 'lonely-assistant-typing' })
+		for (let i = 0; i < 3; i++) typing.createSpan({ cls: 'lonely-assistant-typing-dot', text: '•' })
 	}
 
 	private renderUserMessage(container: HTMLElement, content: string) {
@@ -575,6 +874,20 @@ export class LonelyAssistantView extends ItemView {
 			const textNode = container.createSpan({ cls: 'lonely-assistant-user-text' })
 			textNode.setText(content.slice(lastIndex))
 		}
+	}
+
+	private normalizeToolArguments(args: unknown): Record<string, unknown> {
+		if (!args) return {}
+		if (typeof args === 'string') {
+			try {
+				const parsed = JSON.parse(args)
+				return typeof parsed === 'object' && parsed ? parsed as Record<string, unknown> : {}
+			} catch {
+				return {}
+			}
+		}
+		if (typeof args === 'object') return args as Record<string, unknown>
+		return {}
 	}
 
 	getLastAssistantResponse(): string | null {
@@ -864,5 +1177,94 @@ export class LonelyAssistantView extends ItemView {
 		
 		this.setCaretPosition(caretPos)
 		this.isUpdatingInput = false
+	}
+
+	private renderToolsSection() {
+		const toolsContainer = this.contentEl.createDiv('lonely-assistant-tools')
+		const toolsHeader = toolsContainer.createDiv('lonely-assistant-tools-header')
+		toolsHeader.createSpan({ text: 'Available Tools' })
+		
+		const toolsCollapseButton = toolsHeader.createEl('button', {
+			cls: 'lonely-assistant-tools-collapse-button',
+			attr: { 'aria-label': 'Toggle Tools' }
+		})
+		toolsCollapseButton.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg>`
+		
+		const toolsList = toolsContainer.createDiv('lonely-assistant-tools-list')
+		toolsContainer.classList.add('is-collapsed')
+		
+		toolsCollapseButton.addEventListener('click', () => {
+			toolsContainer.classList.toggle('is-collapsed')
+			if (toolsContainer.classList.contains('is-collapsed')) {
+				toolsCollapseButton.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg>`
+			} else {
+				toolsCollapseButton.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="18 15 12 9 6 15"></polyline></svg>`
+			}
+		})
+		
+		const tools = this.plugin.toolRegistry.getAvailableTools()
+		
+		if (tools.length === 0) {
+			toolsList.createEl('div', { 
+				cls: 'lonely-assistant-tools-empty',
+				text: 'No tools enabled. Enable tools in settings.' 
+			})
+			return
+		}
+		
+		for (const tool of tools) {
+			const toolItem = toolsList.createDiv('lonely-assistant-tool-item')
+			
+			const toolIcon = toolItem.createSpan({ cls: 'lonely-assistant-tool-icon' })
+			setIcon(toolIcon, this.getToolIcon(tool.name))
+			
+			const toolInfo = toolItem.createDiv('lonely-assistant-tool-info')
+			toolInfo.createEl('div', { cls: 'lonely-assistant-tool-name', text: tool.name })
+			toolInfo.createEl('div', { cls: 'lonely-assistant-tool-description', text: tool.description })
+		}
+	}
+
+	private getToolIcon(toolName: string): string {
+		const icons: Record<string, string> = {
+			'find': 'search',
+			'grep': 'search',
+			'read': 'file-text',
+			'apply_patch': 'edit',
+			'web_search': 'globe',
+			'web_fetch': 'globe'
+		}
+		return icons[toolName] || 'wrench'
+	}
+
+	private formatToolName(name: string): string {
+		const nameMap: Record<string, string> = {
+			'find': 'Find Tool',
+			'grep': 'Grep Tool',
+			'read': 'Read File',
+			'apply_patch': 'Apply Patch',
+			'web_search': 'Web Search',
+			'web_fetch': 'Web Fetch'
+		}
+		return nameMap[name] || name.split('_').map(word => 
+			word.charAt(0).toUpperCase() + word.slice(1)
+		).join(' ')
+	}
+
+	private renderToolParams(container: HTMLElement, params: Record<string, unknown>): void {
+		const paramsList = container.createDiv({ cls: 'lonely-assistant-tool-params' })
+		
+		for (const [key, value] of Object.entries(params)) {
+			const paramRow = paramsList.createDiv({ cls: 'lonely-assistant-tool-param-row' })
+			paramRow.createSpan({ cls: 'lonely-assistant-tool-param-key', text: key + ':' })
+			
+			const valueSpan = paramRow.createSpan({ cls: 'lonely-assistant-tool-param-value' })
+			if (typeof value === 'string') {
+				valueSpan.setText(value)
+			} else if (typeof value === 'object' && value !== null) {
+				valueSpan.setText(JSON.stringify(value))
+			} else {
+				valueSpan.setText(String(value))
+			}
+		}
 	}
 }

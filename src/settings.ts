@@ -1,3 +1,5 @@
+import { ToolSettings, DEFAULT_TOOL_SETTINGS } from './tools/types'
+
 export interface LonelyAssistantSettings {
 	ollamaHost: string
 	model: string
@@ -7,6 +9,7 @@ export interface LonelyAssistantSettings {
 	ragEnabled: boolean
 	ragMaxContext: number
 	ragExcludeFolders: string[]
+	tools: ToolSettings
 }
 
 export const DEFAULT_SETTINGS: LonelyAssistantSettings = {
@@ -18,6 +21,7 @@ export const DEFAULT_SETTINGS: LonelyAssistantSettings = {
 	ragEnabled: true,
 	ragMaxContext: 4,
 	ragExcludeFolders: [],
+	tools: DEFAULT_TOOL_SETTINGS
 }
 
 export function mergeSettings(loaded: unknown): LonelyAssistantSettings {
@@ -41,5 +45,10 @@ export function mergeSettings(loaded: unknown): LonelyAssistantSettings {
 		...DEFAULT_SETTINGS,
 		...partial,
 		ragExcludeFolders: exclude,
+		tools: {
+			...DEFAULT_TOOL_SETTINGS,
+			...(partial.tools || {})
+		}
 	}
 }
+

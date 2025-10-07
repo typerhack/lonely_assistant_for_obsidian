@@ -93,27 +93,30 @@
 
 **Tasks**
 8. **Tool Provider Architecture**
-   - [ ] Create `ToolProvider` interface for registering tools with metadata
-   - [ ] Implement `ToolRegistry` to manage available tools and their execution
-   - [ ] Add tool discovery and capability negotiation for AI context
-   - [ ] Implement tool execution with logging and user consent workflows
+   - [x] Create `ToolProvider` interface for registering tools with metadata
+   - [x] Implement `ToolRegistry` to manage available tools and their execution
+   - [x] Add tool discovery and capability negotiation for AI context
+   - [x] Implement tool execution with logging and user consent workflows
+   - [x] Create `BuiltInToolProvider` bundling all 6 core tools
+   - [x] Integrate `ToolRegistry` lifecycle in plugin (initialize, shutdown, settings updates)
 
 9. **Vault Operation Tools**
-   - [ ] **Find Tool**: Search for files by name/path pattern using glob/fuzzy matching
-   - [ ] **Grep Tool**: Search file contents using regex patterns with context
-   - [ ] **Read Tool**: Retrieve full or partial file contents safely
-   - [ ] **Apply Patch Tool**: Propose and apply file edits with diff preview
+   - [x] **Find Tool**: Search for files by name/path pattern using glob/fuzzy matching
+   - [x] **Grep Tool**: Search file contents using regex patterns with context
+   - [x] **Read Tool**: Retrieve full or partial file contents safely
+   - [x] **Apply Patch Tool**: Propose and apply file edits with diff preview
 
 10. **External Knowledge Tools**
-    - [ ] **Web Search Tool**: Integrate Ollama's web search API for external queries
-    - [ ] **Web Fetch Tool**: Retrieve and parse web page content via Ollama API
-    - [ ] Add API key management for Ollama web search features
-    - [ ] Implement result caching and rate limiting
+    - [x] **Web Search Tool**: Integrate Ollama's web search API for external queries
+    - [x] **Web Fetch Tool**: Retrieve and parse web page content via Ollama API
+    - [x] Add API key management for Ollama web search features
+    - [x] Implement result caching and rate limiting
 
 11. **Tool UI & Safety**
+    - [x] Add comprehensive tool settings UI with 6 sections (Tool Management, External APIs, Network Security, Performance, Privacy & Audit, Tool-Specific Settings)
     - [ ] Display available tools in chat interface with descriptions
     - [ ] Show tool execution previews before actions
-    - [ ] Add per-tool consent toggles in settings
+    - [ ] Implement consent dialogs for tool execution approval/denial
     - [ ] Log all tool invocations with results for auditing
     - [ ] Implement rollback mechanisms for reversible operations
 

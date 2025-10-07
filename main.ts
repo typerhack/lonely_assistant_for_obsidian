@@ -1,9 +1,13 @@
 import { App, Plugin, PluginSettingTab, Setting, Notice, WorkspaceLeaf, Editor } from 'obsidian'
+import { Logger } from './src/logger'
 import { LonelyAssistantView, VIEW_TYPE_LONELY_ASSISTANT } from './src/LonelyAssistantView'
 import { OllamaClient } from './src/OllamaClient'
 import { LonelyAssistantSettings, mergeSettings, DEFAULT_SETTINGS } from './src/settings'
 import { RAGService } from './src/rag'
 import { previewAndApplySelection } from './src/editing'
+import { ToolSettingsSection } from './src/ToolSettingsTab'
+import { ToolRegistry } from './src/tools/ToolRegistry'
+import { BuiltInToolProvider } from './src/tools/BuiltInToolProvider'
 
 export default class LonelyAssistantPlugin extends Plugin {
 	settings: LonelyAssistantSettings
@@ -11,6 +15,7 @@ export default class LonelyAssistantPlugin extends Plugin {
 	availableModels: string[] = []
 	modelLoadError: string | null = null
 	ragService: RAGService
+	toolRegistry: ToolRegistry
 
 	async onload() {
 		await this.loadSettings()
@@ -20,6 +25,12 @@ export default class LonelyAssistantPlugin extends Plugin {
 
 		this.ragService = new RAGService(this)
 		await this.ragService.initialize()
+
+		this.toolRegistry = new ToolRegistry(this.app, this.settings.tools, async () => {
+			await this.saveSettings()
+		})
+		await this.toolRegistry.initialize()
+		await this.toolRegistry.registerProvider(new BuiltInToolProvider(this.app, this.settings.tools))
 
 		// Register the sidebar view
 		this.registerView(VIEW_TYPE_LONELY_ASSISTANT, (leaf) => new LonelyAssistantView(leaf, this))
@@ -64,10 +75,16 @@ export default class LonelyAssistantPlugin extends Plugin {
 
 		// Add settings tab
 		this.addSettingTab(new LonelyAssistantSettingTab(this.app, this))
+
+		// Initialize console logger state
+		Logger.setEnabled(this.settings?.tools?.printLogs === true)
 	}
 
-	onunload() {
+	async onunload() {
 		this.app.workspace.detachLeavesOfType(VIEW_TYPE_LONELY_ASSISTANT)
+		if (this.toolRegistry) {
+			await this.toolRegistry.shutdown()
+		}
 	}
 
 	async loadSettings() {
@@ -79,6 +96,10 @@ export default class LonelyAssistantPlugin extends Plugin {
 		if (this.ragService) {
 			await this.ragService.setEnabled(this.settings.ragEnabled)
 		}
+		if (this.toolRegistry) {
+			this.toolRegistry.updateSettings(this.settings.tools)
+		}
+		Logger.setEnabled(this.settings?.tools?.printLogs === true)
 	}
 
 	async activateView() {
@@ -166,9 +187,43 @@ class LonelyAssistantSettingTab extends PluginSettingTab {
 		const { containerEl } = this
 
 		containerEl.empty()
-
 		containerEl.createEl('h2', { text: 'Lonely Assistant Settings' })
 
+		// Tabs
+		const tabs = containerEl.createDiv({ cls: 'la-main-tabs' })
+		const content = containerEl.createDiv({ cls: 'la-main-tabs-content' })
+		const panels: Record<string, HTMLElement> = {
+			general: content.createDiv({ cls: 'la-main-tab-panel' }),
+			rag: content.createDiv({ cls: 'la-main-tab-panel' }),
+			tools: content.createDiv({ cls: 'la-main-tab-panel' }),
+		}
+
+		const select = (name: 'general' | 'rag' | 'tools') => {
+			for (const key of Object.keys(panels) as Array<'general'|'rag'|'tools'>) {
+				panels[key].toggleClass('is-active', key === name)
+			}
+			Array.from(tabs.children).forEach(child => child.toggleClass('is-active', (child as HTMLButtonElement).dataset.tab === name))
+		}
+
+		const addTab = (name: 'general'|'rag'|'tools', label: string) => {
+			const btn = tabs.createEl('button', { cls: 'la-main-tab', text: label }) as HTMLButtonElement
+			btn.dataset.tab = name
+			btn.addEventListener('click', () => select(name))
+		}
+
+		addTab('general', 'General')
+		addTab('rag', 'Context & Retrieval')
+		addTab('tools', 'Tools')
+
+		this.renderGeneralSettings(panels.general)
+		this.renderRagSettings(panels.rag)
+		const toolSettings = new ToolSettingsSection(panels.tools, this.plugin)
+		toolSettings.display()
+
+		select('general')
+	}
+
+	private renderGeneralSettings(containerEl: HTMLElement) {
 		new Setting(containerEl)
 			.setName('Ollama Host')
 			.setDesc('URL of your Ollama server (default: http://localhost:11434)')
@@ -293,6 +348,9 @@ class LonelyAssistantSettingTab extends PluginSettingTab {
 			})
 		})
 
+	}
+
+	private renderRagSettings(containerEl: HTMLElement) {
 		containerEl.createEl('h3', { text: 'Context & Retrieval (RAG)' })
 
 		new Setting(containerEl)
@@ -359,5 +417,7 @@ class LonelyAssistantSettingTab extends PluginSettingTab {
 					new Notice('Cleared Lonely Assistant index')
 				})
 			})
+
+		// Tools are in their own tab
 	}
 }

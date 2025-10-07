@@ -8,6 +8,7 @@ This document defines the visual language for the Lonely Assistant Obsidian plug
 2. **Keep it lightweight.** Avoid gradients, heavy borders, or custom shadows that fight the vault aesthetic.
 3. **Emphasise readability.** Use generous padding, clear hierarchy, and consistent typography scaling.
 4. **Consistency beats novelty.** Reuse spacing, radius, and layout primitives across all components.
+5. **NO EMOJIS ALLOWED (STRICT RULE).** Never use emojis in UI, code, or user-facing text. Use only Obsidian's built-in Lucide icon system via `setIcon()` method.
 
 ## Foundations
 
@@ -76,7 +77,15 @@ Always use native Obsidian CSS variables:
 ## Accessibility
 - Maintain contrast by using theme tokens; do not hardcode light/dark values.
 - Ensure actionable controls have at least `44px` tap targets where possible.
-- Provide textual status feedback (e.g. the “Thinking…” label) alongside visual indicators.
+- Provide textual status feedback (e.g. the "Thinking…" label) alongside visual indicators.
+
+## Icons & Visual Elements
+- **STRICT RULE: NO EMOJIS** - Emojis are forbidden in all UI surfaces
+- Use Obsidian's native `setIcon(element, iconName)` API exclusively
+- Icon library: Lucide (https://lucide.dev/) - Obsidian's built-in icon set
+- Example usage: `setIcon(buttonEl, 'plus')`, `setIcon(buttonEl, 'trash')`
+- For inline icons in HTML: use `<span class="icon-name"></span>` or call `setIcon()` on the element
+- No external icon libraries (React Icons, Lucid Icons, etc.) are installed or permitted
 
 ## Implementation Checklist
 - [ ] Uses only Obsidian CSS variables for colors.
@@ -84,5 +93,6 @@ Always use native Obsidian CSS variables:
 - [ ] Buttons/bubbles share the standard radii and typography.
 - [ ] Streaming states reuse `lonely-assistant-typing` classes.
 - [ ] No gradients or hardcoded shadows outside the permitted subtle hover shadow.
+- [ ] NO EMOJIS - only Lucide icons via setIcon() method.
 
 Keep this file up to date as the design evolves. Any new component should be added here first, then implemented in code.

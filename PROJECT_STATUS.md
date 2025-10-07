@@ -1,5 +1,39 @@
 # Project Status
 
+## v0.0.5
+
+### Changelog
+
+- Documentation and rules:
+  - Added `docs/LOGGING_SYSTEM.md` for console logging system usage.
+  - Updated `AGENTS.md` to reference logging system documentation and added strict UI/icon rules (no emojis, Lucide icons only).
+  - Updated `docs/PROJECT_PHASE.md`:
+    - Marked Tool Provider Architecture and Vault Operation Tools as complete.
+    - Marked Web Search/Fetch Tools, API key management, and caching as complete.
+    - Added new tasks for Tool UI & Safety and marked tool settings UI as complete.
+  - Updated `docs/SYSTEM_DESIGN.md` with new UI/UX and tool consent dialog styles.
+
+- Features and enhancements:
+  - Added new tool system modules:
+    - `src/tools/ToolRegistry.ts`, `src/tools/BuiltInToolProvider.ts`, `src/tools/FindTool.ts`, `src/tools/GrepTool.ts`, `src/tools/ReadTool.ts`, `src/tools/ApplyPatchTool.ts`, `src/tools/WebSearchTool.ts`, `src/tools/WebFetchTool.ts`, `src/tools/ConsentManager.ts`, `src/tools/AuditLogger.ts`, `src/tools/RateLimiter.ts`, `src/tools/toolSchemaConverter.ts`, `src/tools/types.ts`.
+    - Integrated tool registry and provider lifecycle in plugin.
+    - Implemented tool discovery, capability negotiation, and execution with logging and user consent workflows.
+    - Added tool settings UI (`src/ToolSettingsTab.ts`) with 6 sections.
+    - Added audit logging and rate limiting for tool calls.
+    - Added consent dialog UI and logic for tool execution.
+  - Added `src/logger.ts` for logging infrastructure.
+
+- UI and styles:
+  - Major style updates in `styles.css` for tool lists, consent dialogs, and settings tabs.
+  - Added new classes for tool UI, consent badges, and improved layout.
+
+- Refactoring and maintenance:
+  - Updated `main.ts`, `manifest.json`, `package.json` for new tool system and version bump.
+  - Updated `src/LonelyAssistantView.ts`, `src/OllamaClient.ts`, `src/rag.ts`, `src/settings.ts` for tool integration and improved maintainability.
+
+- Other:
+  - Minor code cleanups and improved modularity across the codebase.
+
 ## v0.0.4
 
 ### Changelog

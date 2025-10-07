@@ -7,6 +7,7 @@
 - **`docs/API_DOC.md`** - Code-level API documentation. New APIs are not considered complete until documented here.
 - **`docs/PROJECT_PHASE.md`** - Project roadmap and work breakdown structure. Check current phase before starting new work.
 - **`docs/TOOLS_DOC.md`** - Tool system architecture and specifications. Reference when implementing Phase 2.5 features.
+ - **`docs/LOGGING_SYSTEM.md`** - How to enable and use the console logging system for development.
 
 ## Build Commands
 - `npm run dev` - Development build with watch mode
@@ -49,3 +50,12 @@
 - Keep `main.ts` minimal - only plugin lifecycle
 - Split features into separate modules under `src/`
 - Settings in dedicated file with interface and defaults
+
+### UI & Icons (STRICT RULE - NON-NEGOTIABLE)
+- **NO EMOJIS ALLOWED** - Emojis are strictly forbidden in the UI, code, or user-facing text
+- Use Obsidian's built-in icon system (`setIcon()` method) for all icons
+- Available icon names: https://lucide.dev/ (Obsidian uses Lucide icons internally)
+- For custom icons, use SVG strings with `setIcon()` or inline SVG elements
+- Example: `button.setIcon('plus')`, `button.setIcon('trash')`, `button.setIcon('refresh-ccw')`
+- This rule applies to: buttons, labels, notifications, settings, chat UI, and all other surfaces
+- No icon library is currently installed - use only Obsidian's native icon system

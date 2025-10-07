@@ -103,14 +103,18 @@ export class RAGService {
 		await this.flushIndex()
 	}
 
-	async getContextForMessage(query: string): Promise<RAGContext | null> {
+	async getContextForMessage(query: string, options: { allowRetrieved?: boolean } = {}): Promise<RAGContext | null> {
 		if (!this.plugin.settings.ragEnabled) {
 			return null
 		}
 		await this.ready
 		const tokens = this.tokenize(query)
 		const active = await this.getActiveNoteChunks(tokens)
-		const retrieved = this.retrieveChunks(tokens, active.map((chunk) => chunk.chunk.file))
+		const retrieved = options.allowRetrieved && active.length === 0
+			? this.retrieveChunks(tokens, [])
+			: options.allowRetrieved && active.length > 0
+				? this.retrieveChunks(tokens, active.map(c => c.chunk.file))
+				: []
 		const prompt = this.buildPrompt(active, retrieved)
 		if (!active.length && !retrieved.length) {
 			return null
@@ -360,11 +364,8 @@ export class RAGService {
 	}
 
 	private async getActiveNoteChunks(tokens: string[]): Promise<RetrievedChunk[]> {
-		const view = this.app.workspace.getActiveViewOfType(MarkdownView)
-		if (!view) {
-			return []
-		}
-		const file = view.file
+		// Use active file instead of active view so chat focus doesn't break detection
+		const file = this.app.workspace.getActiveFile()
 		if (!file || file.extension !== 'md') {
 			return []
 		}
@@ -373,28 +374,27 @@ export class RAGService {
 		if (!chunks.length) {
 			return []
 		}
-		const cursor = view.editor.getCursor()
-		const cursorOffset = view.editor.posToOffset(cursor)
-		const selection = view.editor.getSelection()
-		const selectionTokens = selection ? this.tokenize(selection) : []
-		const combinedTokens = tokens.length ? tokens : selectionTokens
-		let best: VaultChunk | null = null
-		let bestScore = -Infinity
-		for (const chunk of chunks) {
-			if (cursorOffset >= chunk.start && cursorOffset <= chunk.end) {
-				best = chunk
-				break
-			}
-			const score = this.scoreChunk(chunk, combinedTokens)
-			if (score > bestScore) {
-				best = chunk
-				bestScore = score
-			}
+		// Try to honor cursor position if the markdown view for this file is active
+		let cursorIndex = -1
+		const activeMdView = this.app.workspace.getActiveViewOfType(MarkdownView)
+		if (activeMdView && activeMdView.file && activeMdView.file.path === file.path) {
+			const cursor = activeMdView.editor.getCursor()
+			const cursorOffset = activeMdView.editor.posToOffset(cursor)
+			cursorIndex = chunks.findIndex(c => cursorOffset >= c.start && cursorOffset <= c.end)
 		}
-		if (!best) {
-			best = chunks[0]
+		// Order chunks so the one under the cursor is first (if available), then the rest
+		const ordered = cursorIndex >= 0
+			? [chunks[cursorIndex], ...chunks.slice(0, cursorIndex), ...chunks.slice(cursorIndex + 1)]
+			: [...chunks]
+		const results: RetrievedChunk[] = []
+		let score = 1000
+		for (const chunk of ordered) {
+			const clean = this.sanitizeForPrompt(chunk.content)
+			if (!clean.trim()) continue
+			results.push({ chunk, score, source: 'active' })
+			score -= 1
 		}
-		return [{ chunk: best, score: bestScore > 0 ? bestScore : 1, source: 'active' }]
+		return results
 	}
 
 	private retrieveChunks(tokens: string[], excludeFiles: string[]): RetrievedChunk[] {
@@ -410,6 +410,11 @@ export class RAGService {
 			}
 			const score = this.scoreChunk(chunk, tokens)
 			if (score <= 0) {
+				continue
+			}
+			// Skip chunks that become empty after sanitization (e.g., images-only)
+			const clean = this.sanitizeForPrompt(chunk.content)
+			if (!clean.trim()) {
 				continue
 			}
 			scored.push({ chunk, score, source: 'retrieved' })
@@ -439,26 +444,33 @@ export class RAGService {
 
 	buildPrompt(active: RetrievedChunk[], retrieved: RetrievedChunk[], mentions: RetrievedChunk[] = []): string {
 		const sections: string[] = []
-		const formatter = (entry: RetrievedChunk, index: number) => {
+		const append = (entry: RetrievedChunk, index: number, sourceOverride?: 'active' | 'retrieved' | 'mention') => {
 			const location = entry.chunk.headings.length ? `${entry.chunk.file} > ${entry.chunk.headings.join(' > ')}` : entry.chunk.file
-			return `${index}. (${entry.source}) ${location}\n${entry.chunk.content}`
+			const clean = this.sanitizeForPrompt(entry.chunk.content).trim()
+			if (!clean) return
+			sections.push(`${index}. (${sourceOverride ?? entry.source}) ${location}\n${clean}`)
 		}
 		let counter = 1
-		for (const entry of active) {
-			sections.push(formatter(entry, counter))
-			counter += 1
-		}
-		for (const entry of retrieved) {
-			sections.push(formatter(entry, counter))
-			counter += 1
-		}
-		for (const entry of mentions) {
-			sections.push(formatter({ ...entry, source: 'mention' }, counter))
-			counter += 1
-		}
-		if (!sections.length) {
-			return ''
-		}
+		for (const entry of active) append(entry, counter++)
+		for (const entry of retrieved) append(entry, counter++)
+		for (const entry of mentions) append(entry, counter++, 'mention')
+		if (!sections.length) return ''
 		return `Context snippets:\n${sections.join('\n\n')}\n\nUse the context above when answering. Cite the snippet numbers when relevant.`
+	}
+
+	// Remove noisy markup from snippets (images, embeds, raw links) leaving useful text
+	private sanitizeForPrompt(text: string): string {
+		let out = text
+		// Remove markdown image embeds ![alt](url) and wiki image embeds ![[...]]
+		out = out.replace(/!\[[^\]]*\]\([^\)]+\)/g, '')
+		out = out.replace(/!\[\[[^\]]+\]\]/g, '')
+		// Replace standard links [text](url) with just the text
+		out = out.replace(/\[([^\]]+)\]\((?:[^\)]+)\)/g, '$1')
+		// Strip HTML <img ...>
+		out = out.replace(/<img[^>]*>/gi, '')
+		// Collapse excessive whitespace
+		out = out.replace(/[\t\f\r]+/g, ' ')
+		out = out.replace(/\n{3,}/g, '\n\n')
+		return out
 	}
 }
