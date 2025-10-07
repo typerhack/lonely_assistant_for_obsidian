@@ -26,7 +26,7 @@ export class LonelyAssistantView extends ItemView {
 	contextToggleEl: HTMLInputElement
 	contextCollapseButton: HTMLElement
 	contextCollapsed = true
-	inputEl: HTMLTextAreaElement
+	inputEl: HTMLDivElement
 	sendButton: HTMLButtonElement
 	cancelButton: HTMLButtonElement
 	isStreaming = false
@@ -42,6 +42,7 @@ export class LonelyAssistantView extends ItemView {
 	mentionSuggestions: TFile[] = []
 	mentionSelectedIndex = 0
 	mentionRange: { start: number; end: number } | null = null
+	isUpdatingInput = false
 
 	constructor(leaf: WorkspaceLeaf, plugin: LonelyAssistantPluginApi) {
 		super(leaf)
@@ -128,10 +129,13 @@ export class LonelyAssistantView extends ItemView {
 
 		const inputGroup = this.inputWrapperEl.createDiv('lonely-assistant-input-group')
 		
-		this.inputEl = inputGroup.createEl('textarea', {
-			placeholder: 'Ask the model…',
+		this.inputEl = inputGroup.createDiv({
 			cls: 'lonely-assistant-input',
-			attr: { spellcheck: 'false' }
+			attr: { 
+				contenteditable: 'true',
+				'data-placeholder': 'Ask the model…',
+				spellcheck: 'false'
+			}
 		})
 
 		this.mentionSuggestionsEl = this.inputWrapperEl.createDiv('lonely-assistant-mention-suggestions')
@@ -173,6 +177,8 @@ export class LonelyAssistantView extends ItemView {
 			}
 		})
 		this.inputEl.addEventListener('input', () => {
+			if (this.isUpdatingInput) return
+			this.renderInputContent()
 			this.updateMentionSuggestions()
 		})
 		this.inputEl.addEventListener('blur', () => {
@@ -189,10 +195,10 @@ export class LonelyAssistantView extends ItemView {
 	}
 
 	async sendMessage() {
-		const message = this.inputEl.value.trim()
+		const message = this.getInputText().trim()
 		if (!message || this.isStreaming) return
 
-		this.inputEl.value = ''
+		this.setInputText('')
 		this.hideMentionSuggestions()
 		await this.streamCompletion(message)
 	}
@@ -551,7 +557,7 @@ export class LonelyAssistantView extends ItemView {
 	}
 
 	private renderUserMessage(container: HTMLElement, content: string) {
-		const mentionPattern = /@([^\n@]+?)(?=\s@|$)/g
+		const mentionPattern = /@[^\n@]+?(?=\s\s|\s@|@|$)/g
 		let lastIndex = 0
 		let match: RegExpExecArray | null
 
@@ -561,7 +567,7 @@ export class LonelyAssistantView extends ItemView {
 				textNode.setText(content.slice(lastIndex, match.index))
 			}
 			const mention = container.createSpan({ cls: 'lonely-assistant-mention' })
-			mention.setText(`@${match[1].trim()}`)
+			mention.setText(match[0].trim())
 			lastIndex = match.index + match[0].length
 		}
 
@@ -576,20 +582,27 @@ export class LonelyAssistantView extends ItemView {
 	}
 
 	private handleMentionBackspace(): boolean {
-		const cursor = this.inputEl.selectionStart || 0
-		const value = this.inputEl.value
+		const cursor = this.getCaretPosition()
+		const text = this.getInputText()
 		
-		if (cursor === 0 || this.inputEl.selectionStart !== this.inputEl.selectionEnd) {
+		if (cursor === 0) {
 			return false
 		}
 
-		const beforeCursor = value.slice(0, cursor)
-		const mentionMatch = beforeCursor.match(/@([^\n@]+?)$/)
+		const charBeforeCursor = text[cursor - 1]
+		if (charBeforeCursor !== ' ') {
+			return false
+		}
+
+		const beforeCursor = text.slice(0, cursor)
+		const mentionWithSpaces = beforeCursor.match(/(@[^\n@]+?\s\s)$/)
 		
-		if (mentionMatch) {
-			const mentionStart = cursor - mentionMatch[0].length
-			this.inputEl.value = value.slice(0, mentionStart) + value.slice(cursor)
-			this.inputEl.selectionStart = this.inputEl.selectionEnd = mentionStart
+		if (mentionWithSpaces) {
+			const mentionStart = cursor - mentionWithSpaces[0].length
+			const newText = text.slice(0, mentionStart) + text.slice(cursor)
+			this.setInputText(newText)
+			this.setCaretPosition(mentionStart)
+			this.renderInputContent()
 			return true
 		}
 		
@@ -622,10 +635,10 @@ export class LonelyAssistantView extends ItemView {
 	}
 
 	private updateMentionSuggestions() {
-		const value = this.inputEl.value
-		const cursor = this.inputEl.selectionStart || 0
-		const beforeCursor = value.slice(0, cursor)
-		const match = beforeCursor.match(/@([^\s\n@]*)$/)
+		const text = this.getInputText()
+		const cursor = this.getCaretPosition()
+		const beforeCursor = text.slice(0, cursor)
+		const match = beforeCursor.match(/@([^\n@]*)$/)
 		if (!match) {
 			this.hideMentionSuggestions()
 			return
@@ -689,17 +702,19 @@ export class LonelyAssistantView extends ItemView {
 		if (!this.mentionRange) {
 			return
 		}
-		const value = this.inputEl.value
+		const text = this.getInputText()
 		const mentionText = `@${file.basename}`
-		const before = value.slice(0, this.mentionRange.start)
-		const after = value.slice(this.mentionRange.end)
-		const insertion = `${mentionText} `
+		const before = text.slice(0, this.mentionRange.start)
+		const after = text.slice(this.mentionRange.end)
+		const insertion = `${mentionText}  `
 		const nextValue = before + insertion + after
-		this.inputEl.value = nextValue
+		this.setInputText(nextValue)
 		const cursor = before.length + insertion.length
-		this.inputEl.setSelectionRange(cursor, cursor)
+		this.setCaretPosition(cursor)
+		this.renderInputContent()
 		this.hideMentionSuggestions()
 		this.updateMentionSuggestions()
+		this.inputEl.focus()
 	}
 
 	private scoreMentionCandidate(file: TFile, query: string): number {
@@ -720,7 +735,7 @@ export class LonelyAssistantView extends ItemView {
 	}
 
 	private extractMentions(text: string): string[] {
-		const matches = text.match(/@([^\n@]+?)(?=\s@|$)/g)
+		const matches = text.match(/@[^\n@]+?(?=\s\s|\s@|@|$)/g)
 		if (!matches) {
 			return []
 		}
@@ -758,5 +773,96 @@ export class LonelyAssistantView extends ItemView {
 			this.contextContainer.classList.remove('is-collapsed')
 			this.contextCollapseButton.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="18 15 12 9 6 15"></polyline></svg>`
 		}
+	}
+
+	private getInputText(): string {
+		return this.inputEl.textContent || ''
+	}
+
+	private setInputText(text: string) {
+		this.inputEl.textContent = text
+	}
+
+	private getCaretPosition(): number {
+		const selection = window.getSelection()
+		if (!selection || selection.rangeCount === 0) return 0
+		const range = selection.getRangeAt(0)
+		const preCaretRange = range.cloneRange()
+		preCaretRange.selectNodeContents(this.inputEl)
+		preCaretRange.setEnd(range.endContainer, range.endOffset)
+		return preCaretRange.toString().length
+	}
+
+	private setCaretPosition(position: number) {
+		const selection = window.getSelection()
+		if (!selection) return
+		
+		let currentPos = 0
+		const walk = document.createTreeWalker(this.inputEl, NodeFilter.SHOW_TEXT, null)
+		let node: Node | null
+		
+		while ((node = walk.nextNode())) {
+			const textNode = node as Text
+			const length = textNode.length
+			if (currentPos + length >= position) {
+				const range = document.createRange()
+				range.setStart(textNode, position - currentPos)
+				range.collapse(true)
+				selection.removeAllRanges()
+				selection.addRange(range)
+				return
+			}
+			currentPos += length
+		}
+		
+		const range = document.createRange()
+		range.selectNodeContents(this.inputEl)
+		range.collapse(false)
+		selection.removeAllRanges()
+		selection.addRange(range)
+		this.inputEl.focus()
+	}
+
+	private renderInputContent() {
+		if (this.isUpdatingInput) return
+		
+		const text = this.getInputText()
+		
+		const mentionPattern = /@[^\n@]+?(?=\s\s|\s@|@|$)/g
+		const matches = Array.from(text.matchAll(mentionPattern))
+		
+		if (matches.length === 0) {
+			return
+		}
+		
+		const caretPos = this.getCaretPosition()
+		
+		this.isUpdatingInput = true
+		this.inputEl.empty()
+		
+		let lastIndex = 0
+		
+		for (const match of matches) {
+			if (match.index === undefined) continue
+			
+			if (match.index > lastIndex) {
+				this.inputEl.appendText(text.slice(lastIndex, match.index))
+			}
+			
+			const mentionSpan = this.inputEl.createSpan({ cls: 'lonely-assistant-input-mention' })
+			mentionSpan.textContent = match[0]
+			mentionSpan.contentEditable = 'false'
+			
+			lastIndex = match.index + match[0].length
+		}
+		
+		if (lastIndex < text.length) {
+			this.inputEl.appendText(text.slice(lastIndex))
+		} else {
+			this.inputEl.appendText('')
+		}
+		
+		this.setCaretPosition(caretPos)
+		this.isUpdatingInput = false
 	}
 }

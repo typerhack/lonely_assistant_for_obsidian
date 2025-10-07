@@ -1,5 +1,25 @@
 # Project Status
 
+## v0.0.4
+
+### Changelog
+
+- Version bump to 0.0.4 in `manifest.json` and `package.json`.
+- Major input UX refactor in `src/LonelyAssistantView.ts`:
+  - Switched input from `<textarea>` to a contenteditable `<div>`, enabling richer mention handling and improved UI.
+  - Added new methods for caret and text management (`getInputText`, `setInputText`, `getCaretPosition`, `setCaretPosition`, `renderInputContent`).
+  - Improved mention parsing, insertion, and deletion logic for double-space-terminated mentions.
+  - Updated mention rendering and styling logic for both input and chat display.
+  - Enhanced event handling for input, blur, and mention suggestion updates.
+  - Refined regex patterns for mention detection and extraction.
+  - Improved handling of input state and caret restoration.
+- Style improvements in `styles.css`:
+  - Updated `.lonely-assistant-input-mention` for better appearance, spacing, and interaction.
+  - Added placeholder styling for empty contenteditable input.
+  - Adjusted font, padding, border, and background for mentions and input.
+- Other:
+  - Minor code cleanups and improved maintainability in `src/LonelyAssistantView.ts`.
+
 ## v0.0.3
 
 ### Changelog
